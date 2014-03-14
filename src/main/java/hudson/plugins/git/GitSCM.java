@@ -801,6 +801,17 @@ public class GitSCM extends GitSCMBackwardCompatibility {
 
         if (candidates.size() > 1) {
             log.println("Multiple candidate revisions");
+            
+            for (Revision revision : candidates) {
+                if (isRevExcluded(git, revision, listener, buildData)) {
+                    candidates.remove(revision);
+                }
+            }
+        }
+        
+        if (candidates.size() > 1) {   
+            log.println("Multiple candidates remaining after removing excluded revisions");         
+            
             AbstractProject<?, ?> project = build.getProject();
             if (!project.isDisabled()) {
                 log.println("Scheduling another build to catch up with " + project.getFullDisplayName());
@@ -809,6 +820,7 @@ public class GitSCM extends GitSCMBackwardCompatibility {
                 }
             }
         }
+        
         Revision rev = candidates.iterator().next();
         Revision marked = rev;
         for (GitSCMExtension ext : extensions) {
