@@ -517,6 +517,15 @@ public class GitSCM extends GitSCMBackwardCompatibility {
                 }
             }
         }
+        
+        boolean centralizedPolling = true;
+        
+        if (centralizedPolling) {
+        	GitPollingManager pollMan = GitPollingManager.getInstance();
+        	FilePath fp = new FilePath(new File("/tmp/jenkins/"));
+        	GitClient git = createClient(listener, environment, project, n, fp);
+        	pollMan.hasChanges(this, listener, git, project, buildData, environment, extensions);
+        }
 
         GitClient git = createClient(listener, environment, project, n, workingDirectory);
 
