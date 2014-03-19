@@ -5,6 +5,7 @@ import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import com.google.common.collect.Iterables;
+
 import edu.umd.cs.findbugs.annotations.CheckForNull;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.*;
@@ -38,6 +39,9 @@ import hudson.util.IOUtils;
 import hudson.util.ListBoxModel;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
+
+import org.apache.commons.codec.digest.DigestUtils;
+import org.codehaus.plexus.util.io.URLInputStreamFacade;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.transport.RefSpec;
@@ -55,6 +59,7 @@ import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.export.Exported;
 
 import javax.servlet.ServletException;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -519,23 +524,38 @@ public class GitSCM extends GitSCMBackwardCompatibility {
         }
         
         boolean centralizedPolling = true;
+
+        GitClient git = null;
         
         if (centralizedPolling) {
         	GitPollingManager pollMan = GitPollingManager.getInstance();
-        	FilePath fp = new FilePath(new File("/tmp/jenkins/"));
-        	GitClient git = createClient(listener, environment, project, n, fp);
-        	pollMan.hasChanges(this, listener, git, project, buildData, environment, extensions);
+        	
+        	String urls = "";
+            for (RemoteConfig remoteRepository : getParamExpandedRepos(lastBuild)) {
+            	for (URIish uri : remoteRepository.getURIs()) {
+            		urls += uri;
+            	}
+            }
+        	        	
+        	FilePath fp = new FilePath(new File("/tmp/jenkins/" + DigestUtils.shaHex(urls) + "/"));
+        	
+            listener.getLogger().println("File path is " + fp);
+        	
+        	git = createClient(listener, environment, project, n, fp);
+        	
+        	pollMan.doFetch(this, listener, git, project, buildData, environment, extensions);
+        } else {
+        	git = createClient(listener, environment, project, n, workingDirectory);
         }
 
-        GitClient git = createClient(listener, environment, project, n, workingDirectory);
-
-        if (git.hasGitRepo()) {
-            // Repo is there - do a fetch
-            listener.getLogger().println("Fetching changes from the remote Git repositories");
-
+        if (centralizedPolling || git.hasGitRepo()) {
+        	
             // Fetch updates
-            for (RemoteConfig remoteRepository : getParamExpandedRepos(lastBuild)) {
-                fetchFrom(git, listener, remoteRepository);
+            if (!centralizedPolling) {
+                listener.getLogger().println("Fetching changes from the remote Git repositories");
+	            for (RemoteConfig remoteRepository : getParamExpandedRepos(lastBuild)) {
+	                fetchFrom(git, listener, remoteRepository);
+	            }
             }
 
             listener.getLogger().println("Polling for changes in");

@@ -46,43 +46,46 @@ public class GitPollingManager {
 		}
 
 		public void run() {
+			final PrintStream log = listener.getLogger();
             try {
-                final PrintStream log = listener.getLogger();
-
+                log.println("running");
                 List<RemoteConfig> repos = gitSCM.getParamExpandedRepos(project.getLastBuild());
                 if (repos.isEmpty())    return; // defensive check even though this is an invalid configuration
 
                 if (git.hasGitRepo()) {
                     // It's an update
+                	
                     if (repos.size() == 1)
                         log.println("Fetching changes from the remote Git repository");
                     else
                         log.println(MessageFormat.format("Fetching changes from {0} remote Git repositories", repos.size()));
+                    
+                    for (RemoteConfig remoteRepository : repos) {
+                        fetchFrom(git, listener, remoteRepository);
+                    }
                 } else {
                     log.println("Cloning the remote Git repository");
 
                     RemoteConfig rc = repos.get(0);
-                    try {
                         CloneCommand cmd = git.clone_().url(rc.getURIs().get(0).toPrivateString()).repositoryName(rc.getName());
+                        
 //                        for (GitSCMExtension ext : extensions) {
 //                            ext.decorateCloneCommand(gitSCM, project.getLastBuild(), git, listener, cmd);
 //                        }
+
                         cmd.execute();
-                    } catch (GitException ex) {
-                        ex.printStackTrace(listener.error("Error cloning remote repo '%s'", rc.getName()));
-                        throw new AbortException();
-                    }
+
                 }
 
-                for (RemoteConfig remoteRepository : repos) {
-                    fetchFrom(git, listener, remoteRepository);
-                }
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
+			} catch (Exception e) {
+				log.println("Error: " + e.getMessage());
+				log.println("Cause: " + e.getCause().getMessage());
 				e.printStackTrace();
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+			} finally {
+				log.println("notify all");
+				synchronized (this) {
+					this.notifyAll();
+				}
 			}
 		}
 		
@@ -127,22 +130,29 @@ public class GitPollingManager {
 		return instance;
 	}
 
-	public void hasChanges(GitSCM gitSCM, TaskListener listener, GitClient git, AbstractProject<?, ?> project, BuildData buildData, EnvVars environment, DescribableList<GitSCMExtension, GitSCMExtensionDescriptor> extensions) {
+	public void doFetch(GitSCM gitSCM, TaskListener listener, GitClient git, AbstractProject<?, ?> project, BuildData buildData, EnvVars environment, DescribableList<GitSCMExtension, GitSCMExtensionDescriptor> extensions) {
 		try {
+			listener.getLogger().println("Project " + project.getName() + " requesting a fetch");
 			synchronized (this) {
 				if (poller == null) {
+					listener.getLogger().println("Project " + project.getName() + " starting poller");
 					poller = new GitPoller(gitSCM, listener, git, project, buildData, environment, extensions);
 					Thread t = new Thread(poller);
-					t.run();
+					t.start();
 				}
 			}
-			
-			poller.wait();
-			
-			synchronized (this) {
-				poller = null;				
+
+			listener.getLogger().println("Project " + project.getName() + " waiting for fetch");
+			synchronized (poller) {
+				poller.wait();				
 			}
 			
+			synchronized (this) {
+				listener.getLogger().println("Project " + project.getName() + " destroying poller");
+				poller = null;				
+			}
+
+			listener.getLogger().println("Project " + project.getName() + " done waiting for fetch");
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
