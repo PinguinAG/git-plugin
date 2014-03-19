@@ -316,6 +316,11 @@ public class GitSCM extends GitSCMBackwardCompatibility {
         return (gitDescriptor != null && gitDescriptor.isCreateAccountBasedOnEmail());
     }
 
+    public boolean isUseCentralizedPolling() {
+        DescriptorImpl gitDescriptor = getDescriptor();
+        return (gitDescriptor != null && gitDescriptor.isUseCentralizedPolling());
+    }
+    
     public BuildChooser getBuildChooser() {
         BuildChooser bc;
 
@@ -523,11 +528,10 @@ public class GitSCM extends GitSCMBackwardCompatibility {
             }
         }
         
-        boolean centralizedPolling = true;
 
         GitClient git = null;
         
-        if (centralizedPolling) {
+        if (isUseCentralizedPolling()) {
         	GitPollingManager pollMan = GitPollingManager.getInstance();
         	
         	String urls = "";
@@ -536,9 +540,9 @@ public class GitSCM extends GitSCMBackwardCompatibility {
             		urls += uri;
             	}
             }
-        	        	
-        	FilePath fp = new FilePath(new File("/tmp/jenkins/" + DigestUtils.shaHex(urls) + "/"));
-        	
+
+            String home = environment.get("JENKINS_HOME");
+            FilePath fp = new FilePath(new File(home + "/git_centralized/" + DigestUtils.shaHex(urls) + "/"));
             listener.getLogger().println("File path is " + fp);
         	
         	git = createClient(listener, environment, project, n, fp);
@@ -548,10 +552,10 @@ public class GitSCM extends GitSCMBackwardCompatibility {
         	git = createClient(listener, environment, project, n, workingDirectory);
         }
 
-        if (centralizedPolling || git.hasGitRepo()) {
+        if (isUseCentralizedPolling() || git.hasGitRepo()) {
         	
             // Fetch updates
-            if (!centralizedPolling) {
+            if (!isUseCentralizedPolling()) {
                 listener.getLogger().println("Fetching changes from the remote Git repositories");
 	            for (RemoteConfig remoteRepository : getParamExpandedRepos(lastBuild)) {
 	                fetchFrom(git, listener, remoteRepository);
@@ -1079,6 +1083,7 @@ public class GitSCM extends GitSCMBackwardCompatibility {
         private String globalConfigName;
         private String globalConfigEmail;
         private boolean createAccountBasedOnEmail;
+        private boolean useCentralizedPolling;
 //        private GitClientType defaultClientType = GitClientType.GITCLI;
 
         public DescriptorImpl() {
@@ -1153,6 +1158,14 @@ public class GitSCM extends GitSCMBackwardCompatibility {
 
         public void setCreateAccountBasedOnEmail(boolean createAccountBasedOnEmail) {
             this.createAccountBasedOnEmail = createAccountBasedOnEmail;
+        }
+
+        public boolean isUseCentralizedPolling() {
+            return useCentralizedPolling;
+        }
+
+        public void setUseCentralizedPolling(boolean useCentralizedPolling) {
+            this.useCentralizedPolling = useCentralizedPolling;
         }
 
         /**
