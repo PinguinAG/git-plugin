@@ -1,20 +1,17 @@
 package hudson.plugins.git;
 
-import java.io.IOException;
-import java.io.PrintStream;
-import java.text.MessageFormat;
-import java.util.List;
-import java.util.Map;
-
-import hudson.AbortException;
-import hudson.EnvVars;
 import hudson.model.TaskListener;
-import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.plugins.git.extensions.GitSCMExtension;
 import hudson.plugins.git.extensions.GitSCMExtensionDescriptor;
-import hudson.plugins.git.util.BuildData;
 import hudson.util.DescribableList;
+
+import java.io.IOException;
+import java.io.PrintStream;
+import java.text.MessageFormat;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.URIish;
@@ -24,7 +21,7 @@ import org.jenkinsci.plugins.gitclient.GitClient;
 
 public class GitPollingManager {
 	private static GitPollingManager instance;
-	private Map<String, GitPoller> pollers;
+	private Map<String, GitPoller> pollers = new HashMap<String, GitPoller>();
 	
 	private class GitPoller implements Runnable {
 		private TaskListener listener;

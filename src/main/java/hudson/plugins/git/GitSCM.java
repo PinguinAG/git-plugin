@@ -835,7 +835,8 @@ public class GitSCM extends GitSCMBackwardCompatibility {
         if (candidates.size() > 1) {
             log.println("Multiple candidate revisions");
             
-            for (Revision revision : candidates) {
+            for (Iterator<Revision> iter = candidates.iterator(); iter.hasNext();) {
+                Revision revision = iter.next();
                 if (isRevExcluded(git, revision, listener, buildData)) {
                     candidates.remove(revision);
                 }
