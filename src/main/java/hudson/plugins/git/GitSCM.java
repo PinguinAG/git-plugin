@@ -822,6 +822,27 @@ public class GitSCM extends GitSCMBackwardCompatibility {
 
         final String singleBranch = environment.expand( getSingleBranch(environment) );
 
+        @SuppressWarnings("unchecked")
+        Map<String,String> buildVariables = build.getBuildVariables();
+        // "forcebranch" has been set as a build variable, build from the branch specified there
+        if (buildVariables.get("forcebranch") != null) {
+            GitUtils gitUtils = new GitUtils(listener,git);
+            Collection<Revision> branchRevisions = gitUtils.getAllBranchRevisions();
+
+            for (Revision revision : branchRevisions) {
+                for (Branch branch : revision.getBranches()) {
+                    if (branch.getName().contains(buildVariables.get("forcebranch"))) {
+                        log.println("forcebranch = " + buildVariables.get("forcebranch") + " so building " + revision);
+                        Revision marked = revision;
+                        for (GitSCMExtension ext : extensions) {
+                            revision = ext.decorateRevisionToBuild(this,build,git,listener,revision);
+                        }
+                        return new Build(marked, revision, build.getNumber(), null);
+                    }
+                }
+            }
+        }
+
         final BuildChooserContext context = new BuildChooserContextImpl(build.getProject(), build, environment);
         Collection<Revision> candidates = getBuildChooser().getCandidateRevisions(
                 false, singleBranch, git, listener, buildData, context);
@@ -860,6 +881,7 @@ public class GitSCM extends GitSCMBackwardCompatibility {
         for (GitSCMExtension ext : extensions) {
             rev = ext.decorateRevisionToBuild(this,build,git,listener,rev);
         }
+        log.println("Building Revision: " + marked);
         return new Build(marked, rev, build.getNumber(), null);
     }
 
@@ -1040,7 +1062,6 @@ public class GitSCM extends GitSCMBackwardCompatibility {
 
             env.put(GIT_COMMIT, fixEmpty(rev.getSha1String()));
         }
-
        
         if (userRemoteConfigs.size()==1){
             env.put("GIT_URL", userRemoteConfigs.get(0).getUrl());
