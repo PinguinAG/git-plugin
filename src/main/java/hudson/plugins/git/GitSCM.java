@@ -13,6 +13,7 @@ import hudson.init.Initializer;
 import hudson.matrix.MatrixBuild;
 import hudson.matrix.MatrixRun;
 import hudson.model.*;
+import hudson.model.Cause.UpstreamCause;
 import hudson.model.Descriptor.FormException;
 import hudson.model.Hudson.MasterComputer;
 import hudson.plugins.git.browser.GitRepositoryBrowser;
@@ -785,6 +786,77 @@ public class GitSCM extends GitSCMBackwardCompatibility {
         }
     }
 
+    private Revision findRevisionUpstream(final UpstreamCause c, final BuildListener listener) {
+	Revision triggerRevision = null;
+	final String triggerProjectName = c.getUpstreamProject();
+	final int triggerProjectBuild = c.getUpstreamBuild();
+
+	if (VERBOSE) {
+	    listener.getLogger().println(
+		    "Found an upstream cause for this build, triggered by build of project " + triggerProjectName + " Build #" + triggerProjectBuild);
+	}
+
+	for (final AbstractProject project : Jenkins.getInstance().getAllItems(AbstractProject.class)) {
+	    if (project.getName().equals(triggerProjectName)) {
+
+		if (VERBOSE) {
+		    listener.getLogger().println("Found upstream project " + project.getName());
+		}
+
+		final Run triggerBuild = project.getBuildByNumber(triggerProjectBuild);
+		BuildData triggerBuildData = getBuildData(triggerBuild, false);
+		if (triggerBuildData == null) {
+
+		    if (VERBOSE) {
+			listener.getLogger().println("Upstream Project has no BuildData try next cause");
+		    }
+		    break;
+		}
+		triggerBuildData = triggerBuildData.clone();
+		triggerRevision = triggerBuildData.getLastBuiltRevision();
+		if (VERBOSE) {
+		    listener.getLogger().println("Revision the trigger last built on was: " + triggerRevision);
+		}
+
+		filterUninterestingBranches(triggerRevision);
+
+		return triggerRevision;
+	    }
+	}
+
+	listener.getLogger().println("No Revision found here, trying further upstream");
+
+	for (final Cause parentCause : c.getUpstreamCauses()) {
+	    if (parentCause instanceof UpstreamCause) {
+		final Revision fromUpstream = findRevisionUpstream((UpstreamCause) parentCause, listener);
+		if (fromUpstream != null) {
+		    return fromUpstream;
+		}
+	    }
+	}
+
+	listener.getLogger().println("No Revision found");
+	return triggerRevision;
+    }
+
+    public void filterUninterestingBranches(Revision revision) {
+		for (Iterator<Branch> j = revision.getBranches().iterator(); j.hasNext();) {
+            Branch b = j.next();
+            boolean keep = false;
+            for (BranchSpec bspec : getBranches()) {
+                if (bspec.matches(b.getName())) {
+                    keep = true;
+                    break;
+                }
+            }
+
+            if (!keep) {
+                j.remove();
+            }
+        }
+    }
+
+    
     /**
      * Determines the commit to be built in this round, updating the working tree accordingly,
      * and return the information about the selected commit.
@@ -802,6 +874,23 @@ public class GitSCM extends GitSCMBackwardCompatibility {
                                               final BuildListener listener) throws IOException, InterruptedException {
         PrintStream log = listener.getLogger();
 
+        CauseAction causeAction = build.getAction(CauseAction.class);
+        if (causeAction != null) {
+            for(Cause c : causeAction.getCauses()) {
+                if (c instanceof UpstreamCause) {
+                    Revision revisionUpstream = findRevisionUpstream((UpstreamCause) c, listener);
+                    if (revisionUpstream != null) {
+                    	Revision marked = revisionUpstream;
+                    	for (GitSCMExtension ext : extensions) {
+                    		revisionUpstream = ext.decorateRevisionToBuild(this,build,git,listener,revisionUpstream);
+                        }
+                        return new Build(marked, revisionUpstream, build.getNumber(), null);
+                    }
+                }
+            }
+        }
+        
+        
         // every MatrixRun should build the exact same commit ID
         if (build instanceof MatrixRun) {
             MatrixBuild parentBuild = ((MatrixRun) build).getParentBuild();
@@ -830,6 +919,9 @@ public class GitSCM extends GitSCMBackwardCompatibility {
             Collection<Revision> branchRevisions = gitUtils.getAllBranchRevisions();
 
             for (Revision revision : branchRevisions) {
+            	
+            	filterUninterestingBranches(revision);
+            	
                 for (Branch branch : revision.getBranches()) {
                     if (branch.getName().contains(buildVariables.get("forcebranch"))) {
                         log.println("forcebranch = " + buildVariables.get("forcebranch") + " so building " + revision);
