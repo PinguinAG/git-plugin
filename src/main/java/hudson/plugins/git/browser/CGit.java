@@ -23,8 +23,9 @@ public class CGit extends GitRepositoryBrowser {
     private static final long serialVersionUID = 1L;
 
     @DataBoundConstructor
-    public CGit(String url) {
-        super(url);
+    public CGit(String repoUrl) {
+        super(repoUrl);
+        this.normalizeUrl = true;
     }
 
     private QueryBuilder param(URL url) {

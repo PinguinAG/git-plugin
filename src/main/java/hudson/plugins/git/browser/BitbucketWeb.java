@@ -22,8 +22,9 @@ public class BitbucketWeb extends GitRepositoryBrowser {
     private static final long serialVersionUID = 1L;
 
     @DataBoundConstructor
-    public BitbucketWeb(String url) {
-        super(url);
+    public BitbucketWeb(String repoUrl) {
+        super(repoUrl);
+        this.normalizeUrl = true;
     }
 
     @Override

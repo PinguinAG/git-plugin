@@ -30,18 +30,21 @@ public class TestBranchSpec extends TestCase {
         
         Assert.assertTrue(m.matches("origin/magnayn/b1"));
         Assert.assertTrue(m.matches("remote/origin/magnayn/b1"));
+        Assert.assertTrue(m.matches("remotes/origin/magnayn/b1"));
       
         BranchSpec n = new BranchSpec("*/my.branch/*");
         
         Assert.assertTrue(n.matches("origin/my.branch/b1"));
         Assert.assertFalse(n.matches("origin/my-branch/b1"));
         Assert.assertFalse(n.matches("remote/origin/my.branch/b1"));
+        Assert.assertFalse(n.matches("remotes/origin/my.branch/b1"));
       
         BranchSpec o = new BranchSpec("**");
         
         Assert.assertTrue(o.matches("origin/my.branch/b1"));
         Assert.assertTrue(o.matches("origin/my-branch/b1"));
         Assert.assertTrue(o.matches("remote/origin/my.branch/b1"));
+        Assert.assertTrue(o.matches("remotes/origin/my.branch/b1"));
       
         BranchSpec p = new BranchSpec("*");
 
@@ -121,6 +124,16 @@ public class TestBranchSpec extends TestCase {
     	assertEquals("master",branchSpec.getName());
     	branchSpec.setName(" other ");
     	assertEquals("other",branchSpec.getName());
+    }
+    
+    public void testUsesRefsHeads() {
+    	BranchSpec m = new BranchSpec("refs/heads/j*n*");
+    	assertTrue(m.matches("refs/heads/jenkins"));
+    	assertTrue(m.matches("refs/heads/jane"));
+    	assertTrue(m.matches("refs/heads/jones"));
+
+    	assertFalse(m.matches("origin/jenkins"));
+    	assertFalse(m.matches("remote/origin/jane"));
     }
     
     public void testUsesJavaPatternDirectlyIfPrefixedWithColon() {

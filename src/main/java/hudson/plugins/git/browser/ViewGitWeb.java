@@ -28,9 +28,10 @@ public class ViewGitWeb extends GitRepositoryBrowser {
     private final String projectName;
 
     @DataBoundConstructor
-    public ViewGitWeb(String url, String projectName) {
-        super(url);
+    public ViewGitWeb(String repoUrl, String projectName) {
+        super(repoUrl);
         this.projectName = projectName;
+        this.normalizeUrl = true;
     }
 
     @Override

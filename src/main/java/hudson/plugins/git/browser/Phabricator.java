@@ -24,9 +24,10 @@ public class Phabricator extends GitRepositoryBrowser {
     private final String repo;
 
     @DataBoundConstructor
-    public Phabricator(String url, String repo) {
-        super(url);
+    public Phabricator(String repoUrl, String repo) {
+        super(repoUrl);
         this.repo = repo;
+        this.normalizeUrl = true;
     }
 
     public String getRepo() {

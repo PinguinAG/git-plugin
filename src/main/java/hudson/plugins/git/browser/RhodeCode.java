@@ -23,8 +23,9 @@ public class RhodeCode extends GitRepositoryBrowser {
     private static final long serialVersionUID = 1L;
 
     @DataBoundConstructor
-    public RhodeCode(String url) {
-        super(url);
+    public RhodeCode(String repoUrl) {
+        super(repoUrl);
+        this.normalizeUrl = true;
     }
 
     private QueryBuilder param(URL url) {

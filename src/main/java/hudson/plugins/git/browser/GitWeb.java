@@ -23,8 +23,9 @@ public class GitWeb extends GitRepositoryBrowser {
     private static final long serialVersionUID = 1L;
 
     @DataBoundConstructor
-    public GitWeb(String url) {
-        super(url);
+    public GitWeb(String repoUrl) {
+        super(repoUrl);
+        this.normalizeUrl = false;
     }
 
     @Override
